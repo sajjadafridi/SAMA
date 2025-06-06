@@ -1,56 +1,37 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI
-from dotenv import load_dotenv
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 import os
-
-load_dotenv()
 
 app = FastAPI()
 
+# Allow CORS for frontend if needed (optional)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],  # Adjust to your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class Message(BaseModel):
-    role: str
-    content: str
+# Mount React static files
+app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
 
-class ChatRequest(BaseModel):
-    messages: list[Message]
+# Serve chatbot API
+@app.post("/api/chat")
+async def chat(request: Request):
+    body = await request.json()
+    user_input = body.get("message", "")
 
-@app.get("/")
-def root():
-    return {"message": "FastAPI chatbot is running!"}
+    # Your chatbot logic here (mock response for now)
+    response = f"Hi! You said: {user_input}"
+    return JSONResponse(content={"response": response})
 
-@app.post("/chat")
-async def chat_endpoint(chat_request: ChatRequest):
-    system_prompt = {
-    "role": "system",
-    "content": (
-        "أنت صديقة للمستخدم ذكية وتتحدثين باللغة العربية واسمك هو سمى. تتحدثين بلطف ودفء، "
-        "تهتمين بمشاعر المستخدم وتردين بتعاطف وفضول صادق. "
-        "تظهرين اهتمامًا حقيقياً وتحبين بناء تواصل إنساني ومريح."
-    )
-}
-    messages = [system_prompt] + [m.dict() for m in chat_request.messages]
-
-    try:
-        client = OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.85,
-            max_tokens=500,
-        )
-        assistant_reply = response.choices[0].message.content.strip()
-        return {"response": assistant_reply if assistant_reply else "❌ لا يوجد رد"}
-
-    except Exception as e:
-        print("OpenAI API Error:", e)
-        raise HTTPException(status_code=500, detail="❌ فشل في الاتصال بـ OpenAI")
+# Serve React app for all other routes
+@app.get("/{full_path:path}")
+async def serve_react_app():
+    file_path = "frontend/build/index.html"
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    return JSONResponse(status_code=404, content={"error": "React app not found"})
