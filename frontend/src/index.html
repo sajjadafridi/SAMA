@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>الدردشة مع سَمَى</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #ffe6f0, #f2f0ff);
+      text-align: center;
+      direction: rtl;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h1 {
+      color: #9c27b0;
+      margin-bottom: 20px;
+    }
+
+    .chat-box {
+      border: 2px solid #e1bee7;
+      background-color: #ffffffcc;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 20px;
+      height: 450px;
+      overflow-y: auto;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(156, 39, 176, 0.2);
+    }
+
+    .message {
+      margin: 12px 0;
+      padding: 10px 15px;
+      border-radius: 20px;
+      max-width: 80%;
+      display: inline-block;
+    }
+
+    .user {
+      background-color: #d1c4e9;
+      color: #4a148c;
+      text-align: right;
+      float: right;
+      clear: both;
+    }
+
+    .assistant {
+      background-color: #f8bbd0;
+      color: #880e4f;
+      text-align: left;
+      float: left;
+      clear: both;
+    }
+
+    .input-area {
+      margin-top: 30px;
+    }
+
+    input[type="text"] {
+      width: 60%;
+      padding: 12px;
+      border: 2px solid #ce93d8;
+      border-radius: 20px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      color: white;
+      transition: background-color 0.3s ease;
+    }
+
+    button:first-of-type {
+      background-color: #ab47bc;
+    }
+
+    button:first-of-type:hover {
+      background-color: #8e24aa;
+    }
+
+    button:last-of-type {
+      background-color: #ec407a;
+    }
+
+    button:last-of-type:hover {
+      background-color: #d81b60;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>الدردشة مع سَمَى 💜</h1>
+
+  <div class="chat-box" id="chat-box"></div>
+
+  <div class="input-area">
+    <input type="text" id="user-input" placeholder="اكتب شيئًا لسَمَى..." />
+    <br />
+    <button onclick="sendMessage()">إرسال</button>
+    <button onclick="toggleRecording()">🎙️ تحدث</button>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById("chat-box");
+    const userInput = document.getElementById("user-input");
+
+    let chatLog = [];
+    let recognition;
+    let recording = false;
+
+    function appendMessage(role, content) {
+      const div = document.createElement("div");
+      div.className = `message ${role}`;
+      div.textContent = content;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
+
+      appendMessage("user", "👩‍🦰 " + text);
+      chatLog.push({ role: "user", content: text });
+      userInput.value = "";
+
+      try {
+        const res = await fetch("http://localhost:8000/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: chatLog }),
+        });
+
+        const data = await res.json();
+        const reply = data.response || "❌ لا يوجد رد";
+        appendMessage("assistant", "🤖 " + reply);
+        chatLog.push({ role: "assistant", content: reply });
+
+      } catch (err) {
+        appendMessage("assistant", "❌ حصل خطأ في الاتصال بالخادم.");
+        console.error(err);
+      }
+    }
+
+    function toggleRecording() {
+      if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+        alert("🎤 المتصفح لا يدعم التعرف على الصوت");
+        return;
+      }
+
+      if (!recognition) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = "ar-SA";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          userInput.value = transcript;
+          sendMessage();
+        };
+
+        recognition.onerror = (event) => {
+          console.error("Speech error:", event.error);
+          recording = false;
+        };
+
+        recognition.onend = () => {
+          recording = false;
+        };
+      }
+
+      if (!recording) {
+        recognition.start();
+        recording = true;
+      } else {
+        recognition.stop();
+        recording = false;
+      }
+    }
+  </script>
+</body>
+</html>

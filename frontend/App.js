@@ -1,64 +1,50 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import "./App.css";
 
-function App() {
+const Chatbot = () => {
   const [userInput, setUserInput] = useState("");
-  const [chatLog, setChatLog] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const recognitionRef = useRef(null);
 
-  const handleSend = async () => {
-    if (!userInput.trim()) return;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    const newChatLog = [...chatLog, { role: "user", content: userInput }];
-    setChatLog(newChatLog);
-    setUserInput("");
-    setLoading(true);
+  if (!recognitionRef.current && SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+    recognition.lang = "ar-SA";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-    try {
-      const response = await fetch("http://localhost:8000/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ messages: newChatLog }),
-      });
+    recognition.onresult = (event) => {
+      const speechResult = event.results[0][0].transcript;
+      setUserInput(speechResult);
+    };
 
-      const data = await response.json();
-      const botReply = { role: "assistant", content: data.response || "❌ لا يوجد رد" };
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+    };
 
-      setChatLog([...newChatLog, botReply]);
-    } catch (error) {
-      console.error("Error:", error);
-      const errorMsg = { role: "assistant", content: "❌ حصل خطأ أثناء الاتصال بالخادم." };
-      setChatLog([...newChatLog, errorMsg]);
-    } finally {
-      setLoading(false);
+    recognitionRef.current = recognition;
+  }
+
+  const startListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+      console.log("Listening started...");
+    } else {
+      alert("متصفحك لا يدعم التعرف على الصوت");
     }
   };
 
   return (
-    <div className="App">
-      <h2>الدردشة مع سَمَى</h2>
-      <div className="chat-box">
-        {chatLog.map((msg, idx) => (
-          <div key={idx} className={`message ${msg.role}`}>
-            <strong>{msg.role === "user" ? "أنت" : "سَمَى"}:</strong> {msg.content}
-          </div>
-        ))}
-        {loading && <div className="message assistant">سَمَى: ...</div>}
-      </div>
-
-      <div className="input-section">
-        <input
-          type="text"
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          placeholder="اكتب رسالتك هنا..."
-        />
-        <button onClick={handleSend}>إرسال</button>
-      </div>
+    <div>
+      <input
+        type="text"
+        value={userInput}
+        onChange={(e) => setUserInput(e.target.value)}
+        placeholder="اكتب أو تكلم هنا"
+      />
+      <button onClick={startListening}>🎤 تكلم</button>
     </div>
   );
-}
+};
 
-export default App;
+export default Chatbot;
