@@ -90,3 +90,8 @@ async def transcribe_audio(file: UploadFile = File(...)):
     except Exception as e:
         print("🎤 Whisper API Error:", e)
         raise HTTPException(status_code=500, detail="❌ فشل في تحويل الصوت إلى نص")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
